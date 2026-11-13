@@ -1,0 +1,12 @@
+.azure/
+.git*
+.github/
+.vscode/
+docs/
+examples/
+img/
+infra/
+tests/
+local.settings.json
+*.log
+*.pdf
