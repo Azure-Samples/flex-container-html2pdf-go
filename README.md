@@ -50,7 +50,6 @@ deploy to Azure for end-to-end container validation.
 
 - [Git](https://git-scm.com/downloads)
 - [Go 1.27.0](https://go.dev/dl/)
-- [Python 3](https://www.python.org/downloads/) for deployment scripts
 - [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli)
 - [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd)
 - an Azure subscription enabled for the Registry-backed Flex Consumption
@@ -103,8 +102,9 @@ deploy the sample.
 
 During `azd up`:
 
-1. [`imagecontext.py`](./infra/scripts/imagecontext.py) stages only files that
-   affect the image and calculates a deterministic SHA-256.
+1. The standard-library Go
+   [`deployhelper`](./infra/scripts/deployhelper/main.go) stages only files
+   that affect the image and calculates a deterministic SHA-256.
 1. The hash becomes the image tag: `azd-<context-hash>`.
 1. An existing tag is reused; otherwise `az acr build` runs the ACR Tasks
    quick build.
@@ -200,11 +200,7 @@ HTTP 200; Content-Type application/pdf; Bytes 20000
 The byte count varies but must be greater than zero. Verify the PDF boundaries:
 
 ```shell
-python -c "from pathlib import Path
-data = Path('document.pdf').read_bytes()
-assert data.startswith(b'%PDF-')
-assert data.rstrip().endswith(b'%%EOF')
-print(f'Valid PDF: {len(data)} bytes')"
+go run ./infra/scripts/deployhelper validate-pdf document.pdf
 ```
 
 Expected output:

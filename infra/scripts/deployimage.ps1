@@ -41,30 +41,24 @@ function Invoke-WithRetry {
     }
 }
 
-function Get-PythonCommand {
-    foreach ($candidate in @('python', 'python3')) {
-        $command = Get-Command $candidate -ErrorAction SilentlyContinue
-        if (-not $command) {
-            continue
-        }
-        try {
-            & $command.Source --version *> $null
-            if ($LASTEXITCODE -eq 0) {
-                return $command.Source
-            }
-        } catch {
-            continue
+function Get-GoCommand {
+    $command = Get-Command go -ErrorAction SilentlyContinue
+    if ($command) {
+        & $command.Source version *> $null
+        if ($LASTEXITCODE -eq 0) {
+            return $command.Source
         }
     }
-    throw 'Python 3 is required for the deterministic image context.'
+    throw 'Go 1.27 or later is required for the deployment helper.'
 }
 
 $parameterPath = $null
 $buildContext = $null
+$helperPath = $null
 $registryPassword = $null
 
 try {
-    $python = Get-PythonCommand
+    $go = Get-GoCommand
     $subscriptionId = Get-AzdValue 'AZURE_SUBSCRIPTION_ID'
     $environmentName = Get-AzdValue 'AZURE_ENV_NAME'
     $resourceGroup = Get-AzdValue 'AZURE_RESOURCE_GROUP'
@@ -87,10 +81,12 @@ try {
     $buildContext = Join-Path ([IO.Path]::GetTempPath()) (
         "function-image-$([guid]::NewGuid().ToString('N'))"
     )
+    $helperPath = Join-Path ([IO.Path]::GetTempPath()) (
+        "go-deploy-helper-$([guid]::NewGuid().ToString('N')).exe"
+    )
     New-Item -ItemType Directory -Path $buildContext | Out-Null
-    $contextHash = (& $python `
-            (Join-Path $PSScriptRoot 'imagecontext.py') `
-            $buildContext).Trim()
+    & $go build -o $helperPath .\infra\scripts\deployhelper
+    $contextHash = (& $helperPath stage-context $buildContext).Trim()
     if ($contextHash -notmatch '^[0-9a-f]{64}$') {
         throw "Image-context hash is invalid: '$contextHash'."
     }
@@ -256,6 +252,9 @@ try {
     }
     if ($buildContext -and (Test-Path -LiteralPath $buildContext)) {
         Remove-Item -LiteralPath $buildContext -Recurse -Force
+    }
+    if ($helperPath -and (Test-Path -LiteralPath $helperPath)) {
+        Remove-Item -LiteralPath $helperPath -Force
     }
     $registryPassword = $null
     Pop-Location

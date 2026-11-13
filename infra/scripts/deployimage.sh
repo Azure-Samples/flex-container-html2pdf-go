@@ -5,12 +5,8 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPOSITORY_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
 cd "$REPOSITORY_ROOT"
 
-if command -v python3 >/dev/null 2>&1; then
-    PYTHON=python3
-elif command -v python >/dev/null 2>&1; then
-    PYTHON=python
-else
-    echo "Python 3 is required." >&2
+if ! command -v go >/dev/null 2>&1; then
+    echo "Go 1.27 or later is required for the deployment helper." >&2
     exit 1
 fi
 
@@ -53,27 +49,31 @@ retry() {
 
 PARAMETER_PATH=
 BUILD_CONTEXT=
+DEPLOY_HELPER=
 REGISTRY_PASSWORD=
 cleanup() {
     if [ -n "$PARAMETER_PATH" ] && [ -f "$PARAMETER_PATH" ]; then
         rm -f -- "$PARAMETER_PATH"
     fi
     if [ -n "$BUILD_CONTEXT" ] && [ -d "$BUILD_CONTEXT" ]; then
-        BUILD_CONTEXT_TO_REMOVE=$BUILD_CONTEXT "$PYTHON" - <<'PY'
-import os
-from pathlib import Path
-import shutil
-import tempfile
-
-target = Path(os.environ["BUILD_CONTEXT_TO_REMOVE"]).resolve()
-temporary_root = Path(tempfile.gettempdir()).resolve()
-if (
-    target.parent != temporary_root
-    or not target.name.startswith("function-image.")
-):
-    raise RuntimeError(f"Refusing to remove unexpected path: {target}")
-shutil.rmtree(target)
-PY
+        case "$BUILD_CONTEXT" in
+            "${TMPDIR:-/tmp}"/function-image.*)
+                rm -rf -- "$BUILD_CONTEXT"
+                ;;
+            *)
+                echo "Refusing to remove unexpected path: $BUILD_CONTEXT" >&2
+                ;;
+        esac
+    fi
+    if [ -n "$DEPLOY_HELPER" ] && [ -f "$DEPLOY_HELPER" ]; then
+        case "$DEPLOY_HELPER" in
+            "${TMPDIR:-/tmp}"/go-deploy-helper.*)
+                rm -f -- "$DEPLOY_HELPER"
+                ;;
+            *)
+                echo "Refusing to remove unexpected helper: $DEPLOY_HELPER" >&2
+                ;;
+        esac
     fi
     REGISTRY_PASSWORD=
     unset REGISTRY_PASSWORD
@@ -107,7 +107,9 @@ AZURE_FUNCTION_SUBNET_ID=$(get_azd_value AZURE_FUNCTION_SUBNET_ID)
 az account set --subscription "$AZURE_SUBSCRIPTION_ID"
 
 BUILD_CONTEXT=$(mktemp -d "${TMPDIR:-/tmp}/function-image.XXXXXX")
-CONTEXT_HASH=$("$PYTHON" "$SCRIPT_DIR/imagecontext.py" "$BUILD_CONTEXT")
+DEPLOY_HELPER=$(mktemp "${TMPDIR:-/tmp}/go-deploy-helper.XXXXXX")
+go build -o "$DEPLOY_HELPER" ./infra/scripts/deployhelper
+CONTEXT_HASH=$("$DEPLOY_HELPER" stage-context "$BUILD_CONTEXT")
 if ! printf '%s' "$CONTEXT_HASH" | grep -Eq '^[0-9a-f]{64}$'; then
     echo "Image-context hash is invalid: '$CONTEXT_HASH'." >&2
     exit 1
@@ -138,7 +140,7 @@ if [ "$TAG_EXISTS" = true ]; then
 else
     BUILD_ACTION=built
     echo "Building Linux AMD64 image with ACR Tasks: $AZURE_CONTAINER_REGISTRY_ENDPOINT/$TAGGED_IMAGE"
-    PYTHONUTF8=1 PYTHONIOENCODING=utf-8 az acr build \
+    az acr build \
         --registry "$AZURE_CONTAINER_REGISTRY_NAME" \
         --resource-group "$AZURE_RESOURCE_GROUP" \
         --platform linux/amd64 \
@@ -192,57 +194,7 @@ export AZURE_USER_ASSIGNED_IDENTITY_ID
 export AZURE_USER_ASSIGNED_IDENTITY_CLIENT_ID
 export AZURE_FUNCTION_SUBNET_ID AZURE_ACR_TOKEN_NAME
 
-"$PYTHON" - <<'PY'
-import json
-import os
-from pathlib import Path
-
-parameters = {
-    "$schema": (
-        "https://schema.management.azure.com/schemas/"
-        "2019-04-01/deploymentParameters.json#"
-    ),
-    "contentVersion": "1.0.0.0",
-    "parameters": {
-        "environmentName": {"value": os.environ["AZURE_ENV_NAME"]},
-        "functionAppName": {"value": os.environ["AZURE_FUNCTION_NAME"]},
-        "functionLocation": {
-            "value": os.environ["AZURE_FUNCTION_LOCATION"]
-        },
-        "appServicePlanId": {
-            "value": os.environ["AZURE_APP_SERVICE_PLAN_ID"]
-        },
-        "applicationInsightsConnectionString": {
-            "value": os.environ[
-                "AZURE_APPLICATION_INSIGHTS_CONNECTION_STRING"
-            ]
-        },
-        "storageAccountName": {
-            "value": os.environ["AZURE_STORAGE_ACCOUNT_NAME"]
-        },
-        "userAssignedIdentityId": {
-            "value": os.environ["AZURE_USER_ASSIGNED_IDENTITY_ID"]
-        },
-        "userAssignedIdentityClientId": {
-            "value": os.environ["AZURE_USER_ASSIGNED_IDENTITY_CLIENT_ID"]
-        },
-        "virtualNetworkSubnetId": {
-            "value": os.environ["AZURE_FUNCTION_SUBNET_ID"]
-        },
-        "registryImage": {"value": os.environ["REGISTRY_IMAGE"]},
-        "registryUsername": {
-            "value": os.environ["AZURE_ACR_TOKEN_NAME"]
-        },
-        "registryPassword": {
-            "value": os.environ["REGISTRY_PASSWORD"]
-        },
-    },
-}
-
-path = Path(os.environ["PARAMETER_PATH"])
-path.write_text(json.dumps(parameters, indent=2) + "\n", encoding="utf-8")
-path.chmod(0o600)
-PY
+"$DEPLOY_HELPER" write-parameters "$PARAMETER_PATH"
 
 TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
 DEPLOYMENT_NAME="registry-app-$TIMESTAMP"

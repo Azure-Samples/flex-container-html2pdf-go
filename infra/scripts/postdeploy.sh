@@ -1,12 +1,12 @@
 #!/usr/bin/env sh
 set -eu
 
-if command -v python3 >/dev/null 2>&1; then
-    PYTHON=python3
-elif command -v python >/dev/null 2>&1; then
-    PYTHON=python
-else
-    echo "Python 3 is required." >&2
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+REPOSITORY_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
+cd "$REPOSITORY_ROOT"
+
+if ! command -v go >/dev/null 2>&1; then
+    echo "Go 1.27 or later is required for the deployment helper." >&2
     exit 1
 fi
 
@@ -24,20 +24,7 @@ get_azd_value() {
 }
 
 validate_pdf() {
-    "$PYTHON" - "$1" <<'PY'
-from pathlib import Path
-import re
-import sys
-
-pdf = Path(sys.argv[1]).read_bytes()
-if (
-    len(pdf) < 100
-    or not pdf.startswith(b"%PDF-")
-    or re.search(rb"%%EOF\s*$", pdf[-2048:]) is None
-):
-    raise RuntimeError(f"Invalid PDF: {sys.argv[1]}")
-print(len(pdf))
-PY
+    "$DEPLOY_HELPER" validate-pdf "$1"
 }
 
 AZURE_SUBSCRIPTION_ID=$(get_azd_value AZURE_SUBSCRIPTION_ID)
@@ -52,10 +39,27 @@ SITE_ID="/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$AZURE_RESOURCE_GR
 az account set --subscription "$AZURE_SUBSCRIPTION_ID"
 
 TEMPORARY_DIRECTORY=$(mktemp -d "${TMPDIR:-/tmp}/go-pdf-verification.XXXXXX")
+DEPLOY_HELPER=$(mktemp "${TMPDIR:-/tmp}/go-deploy-helper.XXXXXX")
 cleanup() {
-    rm -rf -- "$TEMPORARY_DIRECTORY"
+    case "$TEMPORARY_DIRECTORY" in
+        "${TMPDIR:-/tmp}"/go-pdf-verification.*)
+            rm -rf -- "$TEMPORARY_DIRECTORY"
+            ;;
+        *)
+            echo "Refusing to remove unexpected path: $TEMPORARY_DIRECTORY" >&2
+            ;;
+    esac
+    case "$DEPLOY_HELPER" in
+        "${TMPDIR:-/tmp}"/go-deploy-helper.*)
+            rm -f -- "$DEPLOY_HELPER"
+            ;;
+        *)
+            echo "Refusing to remove unexpected helper: $DEPLOY_HELPER" >&2
+            ;;
+    esac
 }
 trap cleanup EXIT INT TERM
+go build -o "$DEPLOY_HELPER" ./infra/scripts/deployhelper
 
 HELLO_GET_PATH="$TEMPORARY_DIRECTORY/hello-get.txt"
 ATTEMPT=1
@@ -190,23 +194,7 @@ SITE_JSON=$(az rest \
     --query '{state:properties.state,type:properties.functionAppConfig.deployment.storage.type,value:properties.functionAppConfig.deployment.storage.value,subnet:properties.virtualNetworkSubnetId,identity:identity.type}' \
     --output json)
 export SITE_JSON AZURE_REGISTRY_IMAGE AZURE_FUNCTION_SUBNET_ID
-"$PYTHON" - <<'PY'
-import json
-import os
-
-site = json.loads(os.environ["SITE_JSON"])
-if (
-    site["state"] != "Running"
-    or site["type"] != "Registry"
-    or site["value"] != os.environ["AZURE_REGISTRY_IMAGE"]
-    or site["subnet"] != os.environ["AZURE_FUNCTION_SUBNET_ID"]
-    or "UserAssigned" not in site["identity"]
-):
-    raise RuntimeError(
-        "The Function App deployment, identity, or network configuration "
-        "does not match."
-    )
-PY
+"$DEPLOY_HELPER" validate-site
 
 SETTING_NAMES=$(az rest \
     --method post \
@@ -231,30 +219,4 @@ azd env set AZURE_VERIFIED_UTC "$VERIFIED_UTC" --no-prompt >/dev/null
 export AZURE_FUNCTION_NAME AZURE_REGISTRY_IMAGE LEAF_NAMES
 export HELLO_GET_STATUS HELLO_POST_STATUS PDF_GET_BYTES PDF_POST_BYTES
 export INVALID_STATUS VERIFIED_UTC
-"$PYTHON" - <<'PY'
-import json
-import os
-
-print(
-    json.dumps(
-        {
-            "functionApp": os.environ["AZURE_FUNCTION_NAME"],
-            "state": "Running",
-            "deploymentType": "Registry",
-            "image": os.environ["AZURE_REGISTRY_IMAGE"],
-            "functions": [
-                name
-                for name in os.environ["LEAF_NAMES"].splitlines()
-                if name
-            ],
-            "helloGetStatus": int(os.environ["HELLO_GET_STATUS"]),
-            "helloPostStatus": int(os.environ["HELLO_POST_STATUS"]),
-            "pdfGetBytes": int(os.environ["PDF_GET_BYTES"]),
-            "pdfPostBytes": int(os.environ["PDF_POST_BYTES"]),
-            "invalidContentTypeStatus": int(os.environ["INVALID_STATUS"]),
-            "verifiedUtc": os.environ["VERIFIED_UTC"],
-        },
-        separators=(",", ":"),
-    )
-)
-PY
+"$DEPLOY_HELPER" verification-json
