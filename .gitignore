@@ -1,0 +1,9 @@
+.azure/
+.env
+.vscode/
+__pycache__/
+bin/
+dist/
+local.settings.json
+*.pyc
+*.pdf

@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: flex-container-html2pdf-go
+metadata:
+  template: flex-container-html2pdf-go@1.0.0
+
+infra:
+  provider: bicep
+  path: ./infra
+
+hooks:
+  postprovision:
+    windows:
+      shell: pwsh
+      run: ./infra/scripts/postprovision.ps1
+      interactive: false
+      continueOnError: false
+    posix:
+      shell: sh
+      run: ./infra/scripts/postprovision.sh
+      interactive: false
+      continueOnError: false
+  postdeploy:
+    windows:
+      shell: pwsh
+      run: ./infra/scripts/postdeploy.ps1
+      interactive: false
+      continueOnError: false
+    posix:
+      shell: sh
+      run: ./infra/scripts/postdeploy.sh
+      interactive: false
+      continueOnError: false
