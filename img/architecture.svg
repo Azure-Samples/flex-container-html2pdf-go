@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" role="img" aria-labelledby="title description">
+  <title id="title">Go HTML-to-PDF on Azure Functions Flex Consumption containers</title>
+  <desc id="description">HTTPS requests reach an Azure Functions Flex Consumption app running a Go container that uses chromedp and operating-system Chromium to return PDF files. The app pulls its digest-pinned image from Azure Container Registry, reaches Azure Storage through a private endpoint, and sends telemetry to Application Insights.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#57606a"/>
+    </marker>
+    <style>
+      .title { font: 700 24px "Segoe UI", Arial, sans-serif; fill: #24292f; }
+      .heading { font: 700 17px "Segoe UI", Arial, sans-serif; fill: #24292f; }
+      .label { font: 600 14px "Segoe UI", Arial, sans-serif; fill: #24292f; }
+      .text { font: 13px "Segoe UI", Arial, sans-serif; fill: #57606a; }
+      .small { font: 12px "Segoe UI", Arial, sans-serif; fill: #57606a; }
+      .arrow { stroke: #57606a; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .dashed { stroke-dasharray: 7 6; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="700" rx="18" fill="#f6f8fa"/>
+  <text x="600" y="42" text-anchor="middle" class="title">Go HTML-to-PDF on Azure Functions Flex Consumption containers</text>
+
+  <rect x="35" y="245" width="185" height="110" rx="14" fill="#ffffff" stroke="#8c959f" stroke-width="2"/>
+  <text x="128" y="282" text-anchor="middle" class="heading">HTTP client</text>
+  <text x="128" y="310" text-anchor="middle" class="text">Browser, curl, or app</text>
+  <text x="128" y="333" text-anchor="middle" class="small">HTML request / PDF response</text>
+
+  <rect x="275" y="105" width="650" height="500" rx="18" fill="#ffffff" stroke="#0969da" stroke-width="3"/>
+  <rect x="275" y="105" width="650" height="70" rx="16" fill="#0969da"/>
+  <text x="600" y="147" text-anchor="middle" style="font:700 21px 'Segoe UI',Arial,sans-serif;fill:#ffffff">Azure Functions Flex Consumption</text>
+  <text x="600" y="198" text-anchor="middle" class="text">Managed HTTPS endpoint, scaling, routing, and VNet integration</text>
+
+  <rect x="330" y="225" width="540" height="325" rx="16" fill="#ddf4ff" stroke="#54aeff" stroke-width="2"/>
+  <text x="600" y="257" text-anchor="middle" class="heading">Go 1.27 Flex Consumption container</text>
+
+  <rect x="370" y="285" width="190" height="75" rx="12" fill="#ffffff" stroke="#8c959f"/>
+  <text x="465" y="316" text-anchor="middle" class="label">Go worker</text>
+  <text x="465" y="340" text-anchor="middle" class="small">Direct worker entrypoint</text>
+
+  <rect x="640" y="285" width="190" height="75" rx="12" fill="#ffffff" stroke="#8c959f"/>
+  <text x="735" y="316" text-anchor="middle" class="label">handler.go</text>
+  <text x="735" y="340" text-anchor="middle" class="small">Hello + HTML-to-PDF</text>
+
+  <rect x="370" y="410" width="190" height="75" rx="12" fill="#ffffff" stroke="#8c959f"/>
+  <text x="465" y="441" text-anchor="middle" class="label">chromedp</text>
+  <text x="465" y="465" text-anchor="middle" class="small">Bounded isolated renderer</text>
+
+  <rect x="640" y="410" width="190" height="75" rx="12" fill="#ffffff" stroke="#8c959f"/>
+  <text x="735" y="441" text-anchor="middle" class="label">OS Chromium</text>
+  <text x="735" y="465" text-anchor="middle" class="small">Sandbox + system fonts</text>
+
+  <path d="M560 322 L640 322" class="arrow"/>
+  <path d="M735 360 L735 385 L465 385 L465 410" class="arrow"/>
+  <path d="M560 447 L640 447" class="arrow"/>
+
+  <rect x="965" y="95" width="200" height="100" rx="14" fill="#fff8c5" stroke="#bf8700" stroke-width="2"/>
+  <text x="1065" y="132" text-anchor="middle" class="heading">Container Registry</text>
+  <text x="1065" y="158" text-anchor="middle" class="text">Linux AMD64 image</text>
+  <text x="1065" y="178" text-anchor="middle" class="small">Pinned by digest</text>
+
+  <rect x="965" y="275" width="200" height="90" rx="14" fill="#dafbe1" stroke="#1a7f37" stroke-width="2"/>
+  <text x="1065" y="312" text-anchor="middle" class="heading">Storage account</text>
+  <text x="1065" y="338" text-anchor="middle" class="text">Private runtime state</text>
+
+  <rect x="965" y="445" width="200" height="90" rx="14" fill="#fbefff" stroke="#8250df" stroke-width="2"/>
+  <text x="1065" y="482" text-anchor="middle" class="heading">Application Insights</text>
+  <text x="1065" y="508" text-anchor="middle" class="text">Logs and telemetry</text>
+
+  <path d="M220 300 L275 300" class="arrow"/>
+  <text x="247" y="287" text-anchor="middle" class="small">HTTPS</text>
+
+  <path d="M965 165 L925 205" class="arrow"/>
+  <text x="990" y="220" text-anchor="middle" class="small">Image pull</text>
+
+  <path d="M925 320 L965 320" class="arrow dashed"/>
+  <text x="945" y="307" text-anchor="middle" class="small">Private state</text>
+
+  <path d="M925 490 L965 490" class="arrow dashed"/>
+  <text x="945" y="477" text-anchor="middle" class="small">Telemetry</text>
+
+  <path d="M275 335 L220 335" class="arrow"/>
+  <text x="247" y="365" text-anchor="middle" class="small">application/pdf</text>
+
+  <text x="600" y="650" text-anchor="middle" class="text">The container includes the Go worker, application, chromedp, Chromium, and fonts. Azure provides the managed hosting layer.</text>
+</svg>
